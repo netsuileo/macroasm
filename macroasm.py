@@ -13,7 +13,8 @@ keys:
 langstring = """Soon!"""
 
 label_pattern = re.compile('[a-zA-Z0-9]+\:')
-addr_pattern = re.compile('[a-fA-F0-9]{4}')
+
+addr_pattern = re.compile('0x[a-fA-F0-9]{1,4}')
 
 
 class Lex:
@@ -22,7 +23,7 @@ class Lex:
         self.lextype = ''
         self.addr = ''
         self.label = ''
-        self.cmd = ''
+        self.cmdtext = ''
         self.body = ''
 
     @staticmethod
@@ -49,11 +50,12 @@ class Lex:
         return lex
 
     @staticmethod
-    def make_cmd_lex(cmd):
+    def make_cmd_lex(cmd, cmdtype):
         """Makes a lexeme for cmd"""
         lex = Lex()
         lex.lextype = 'cmd'
-        lex.cmd = cmd
+        lex.cmdtext = cmd
+        lex.cmdtype = cmdtype
         return lex
 
     @staticmethod
@@ -69,7 +71,7 @@ class Lex:
             'addr': "type: addr    addr: " + self.addr,
             'end': "type: end",
             'label': "type: label   label: " + self.label,
-            'cmd': "type: cmd     cmd: " + self.cmd,
+            'cmd': "type: cmd     cmd: " + self.cmdtext,
             'unknown': "type: unknown   body: " + self.body,
         }.get(self.lextype, None)
 
@@ -93,29 +95,30 @@ def parse_cmd_line():
         return sys.argv[1:]
 
 
-def is_line_a_cmd(line):
+def get_cmd_type(line):
     """Checks is line a valid cmd string"""
     cmd = line.strip()
     for command in commands:
         if command['pattern'].match(cmd):
-            return True
-    return False
+            return command
+    return None
 
 
 def get_lex(line):
     """Makes a lexeme object from input string"""
+    cmdtype = get_cmd_type(line)
+    if cmdtype:
+        return Lex.make_cmd_lex(line, cmdtype)
     parts = line.lower().strip().split(' ')
-    if parts[0] == 'addr':
-        if addr_pattern.match(parts[1]):
+    if len(parts) == 1:
+        if parts[0] == 'end':
+            return Lex.make_end_lex()
+        if label_pattern.match(parts[0]):
+            return Lex.make_label_lex(parts[0])
+    if len(parts) == 2:
+        if parts[0] == 'addr' and addr_pattern.match(parts[1]):
             return Lex.make_addr_lex(parts[1])
-    elif parts[0] == 'end':
-        return Lex.make_end_lex()
-    elif label_pattern.match(parts[0]):
-        return Lex.make_label_lex(parts[0])
-    elif is_line_a_cmd(line):
-        return Lex.make_cmd_lex(line)
-    else:
-        return Lex.make_unknown_lex(line)
+    return Lex.make_unknown_lex(line)
 
 
 def parse(string):
@@ -126,7 +129,13 @@ def parse(string):
 
 def generate(lexemes):
     """Generates asm code from list of lexemes"""
-    return "42"
+    # TODO
+    # 1) Give an address to every lexeme
+    # 2) Make a table of lables. Give an address to every label
+    # 3) Convert every label in lexemes list to address
+    # 4) Convert every lexeme and its address to byte form
+    # 5) Return bytes in hex form
+    pass
 
 
 def main():
