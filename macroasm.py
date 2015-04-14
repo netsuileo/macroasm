@@ -16,6 +16,8 @@ label_pattern = re.compile('[a-zA-Z0-9_]+\:')
 
 addr_pattern = re.compile('0x[a-fA-F0-9]{1,4}')
 
+byte_pattern = re.compile('[a-fA-F0-9]{1,2}')
+
 
 class Lex:
     """Class that represents a lexeme"""
@@ -59,6 +61,13 @@ class Lex:
         return lex
 
     @staticmethod
+    def make_byte_lex(byte):
+        lex = Lex()
+        lex.lextype = 'byte'
+        lex.body = byte
+        return lex
+
+    @staticmethod
     def make_unknown_lex(lex_str):
         """Makes a lexeme for unknown lexeme"""
         lex = Lex()
@@ -71,7 +80,8 @@ class Lex:
             'addr': "type: addr    addr: " + hex(self.addr),
             'end': "type: end",
             'label': "type: label   label: " + self.label,
-            'cmd': "type: cmd     cmd: " + self.body,
+            'cmd': "type: cmd       cmd: " + self.body,
+            'byte': "type: byte     byte: " + self.body,
             'unknown': "type: unknown   body: " + self.body,
         }.get(self.lextype, None)
 
@@ -115,6 +125,8 @@ def get_lex(line):
             return Lex.make_end_lex()
         if label_pattern.match(parts[0]):
             return Lex.make_label_lex(parts[0][:-1])
+        if byte_pattern.match(parts[0]):
+            return Lex.make_byte_lex(parts[0])
     if len(parts) == 2:
         if parts[0] == 'addr' and addr_pattern.match(parts[1]):
             return Lex.make_addr_lex(int(parts[1], 16))
@@ -160,13 +172,17 @@ def generate(lexemes):
         elif lexeme.lextype == 'cmd':
             lexeme.addr = addr_counter
             addr_counter += lexeme.cmdtype['bytes']
+        elif lexeme.lextype == 'byte':
+            lexeme.addr = addr_counter
+            addr_counter += 1
         elif lexeme.lextype == 'unknown':
             raise Exception("Input lexeme is wrong: " + lexeme.body)
         else:
-            raise Exception("Wrong type of lexeme: " + lexeme.lextype + ". \
-                Probably, you did something wrong changing code of this file. \
+            raise Exception("Wrong type of lexeme: " + lexeme.lextype + ".\n\
+                Probably, you did something wrong changing code of this file.\n\
                 Don't worry, everything will be OK... or not :)")
     # Generation
+    was_addr = False
     generated = ""
     for lexeme in lexemes:
         if lexeme.lextype == 'cmd':
@@ -192,7 +208,11 @@ def generate(lexemes):
             elif cmd_bytes == 1:
                 generated += str(addr) + " " + code + "\n"
         elif lexeme.lextype == 'addr':
-            generated += str(lexeme.addr) + '\n'
+            if not was_addr:
+                generated += str(lexeme.addr) + '\n'
+                was_addr = True
+        elif lexeme.lextype == 'byte':
+            generated += str(lexeme.addr) + " " + lexeme.body + '\n'
     return generated
 
 
